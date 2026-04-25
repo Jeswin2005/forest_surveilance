@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Surveillance Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f9; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; }
+        .alert-item { background: #fee; border-left: 5px solid #f44336; padding: 10px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>📡 Live Network Alerts</h2>
+    <div id="alerts-container"><p>Waiting for network activity...</p></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    databaseURL: "YOUR_DATABASE_URL"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const alertsContainer = document.getElementById("alerts-container");
+  let isFirst = true;
+
+  onChildAdded(ref(db, 'forest_data/vision_events'), (snapshot) => {
+      if (isFirst) { alertsContainer.innerHTML = ""; isFirst = false; }
+      
+      const parts = snapshot.val().split("|");
+      if(parts.length >= 4) {
+          const div = document.createElement("div");
+          div.className = "alert-item";
+          div.innerHTML = `⚠️ <b>${parts[1]}</b> detected <b>${parts[2]}</b> at ${(parseFloat(parts[3])*100).toFixed(1)}% confidence.`;
+          alertsContainer.prepend(div);
+      }
+  });
+</script>
+</body>
+</html>
