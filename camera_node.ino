@@ -314,8 +314,6 @@ void setup() {
     // No transistor removal needed
     SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_NSS);
     LoRa.setPins(LORA_NSS, LORA_RESET, LORA_DIO0);
-    LoRa.setTxPower(2);        // low power — reduces brownout
-    LoRa.setSyncWord(0xF3);    // must match gateway
 
     if (!LoRa.begin(LORA_FREQ)) {
         Serial.println("[LORA] FAILED — check wiring:");
@@ -324,6 +322,9 @@ void setup() {
         Serial.println("       RST→NC       VCC→3.3V");
         while (1) delay(1000);
     }
+    LoRa.setSyncWord(0xF3);    // must match gateway
+    LoRa.setTxPower(2);        // low power — reduces brownout
+
     Serial.println("[LORA] OK");
 
     // ── Camera ─────────────────────────────────────────────
