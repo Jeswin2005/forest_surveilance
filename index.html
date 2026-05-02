@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Forest Surveillance Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            padding: 20px;
+            color: white;
+        }
+        .container {
+            max-width: 650px;
+            margin: auto;
+            background: #16213e;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 6px;
+            font-size: 22px;
+            color: #00d4ff;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 20px;
+        }
+        .status-bar {
+            background: #0f3460;
+            border-radius: 6px;
+            padding: 8px 14px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .status-bar span {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+        #alerts-container {
+            max-height: 480px;
+            overflow-y: auto;
+        }
+        .waiting {
+            text-align: center;
+            color: #555;
+            padding: 40px 0;
+            font-size: 14px;
+        }
+        .alert-item {
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-left: 5px solid;
+            animation: fadeIn 0.4s ease;
+        }
+        .alert-human {
+            background: #2d1515;
+            border-color: #f44336;
+        }
+        .alert-animal {
+            background: #1a2d15;
+            border-color: #4caf50;
+        }
+        .alert-background {
+            background: #1a1a2d;
+            border-color: #555;
+        }
+        .alert-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .alert-label {
+            font-weight: bold;
+            font-size: 15px;
+        }
+        .alert-conf {
+            font-size: 13px;
+            color: #aaa;
+        }
+        .alert-node {
+            font-size: 12px;
+            color: #777;
+        }
+        .alert-time {
+            font-size: 11px;
+            color: #555;
+            margin-top: 4px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .badge-alert { background: #f44336; color: white; }
+        .badge-clear { background: #555; color: #ccc; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>🌲 Forest Surveillance Dashboard</h2>
+    <p class="subtitle">FEHARP LoRa WSN · ACS Edge AI · Real-Time Alerts</p>
+
+    <div class="status-bar">
+        Status: <span id="status-text">Connecting to Firebase...</span>
+        &nbsp;|&nbsp; Events: <span id="event-count">0</span>
+    </div>
+
+    <div id="alerts-container">
+        <p class="waiting">⏳ Waiting for network activity...</p>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp }
+        from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onChildAdded }
+        from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // ── Firebase config ──────────────────────────────────
+    const firebaseConfig = {
+        apiKey:      "YOUR_API_KEY",
+        databaseURL: "YOUR_DATABASE_URL"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    const container  = document.getElementById("alerts-container");
+    const statusText = document.getElementById("status-text");
+    const countEl   = document.getElementById("event-count");
+
+    let isFirst  = true;
+    let count    = 0;
+
+    statusText.textContent = "🟢 Live";
+    statusText.style.color = "#00ff88";
+
+    // ── Listen for new events ────────────────────────────
+    onChildAdded(ref(db, 'forest_data/vision_events'), (snapshot) => {
+
+        // Clear waiting message on first event
+        if (isFirst) {
+            container.innerHTML = "";
+            isFirst = false;
+        }
+
+        const raw = snapshot.val();
+        // Expected format: CAM|N01|HUMAN|0.96
+        const parts = raw.split("|");
+        if (parts.length < 4) return;
+
+        const nodeType   = parts[0];   // CAM
+        const nodeId     = parts[1];   // N01
+        const detection  = parts[2];   // HUMAN / ANIMAL / BACKGROUND
+        const confidence = parseFloat(parts[3]);
+        const confPct    = (confidence * 100).toFixed(1);
+        const isAlert    = detection !== "BACKGROUND";
+        const time       = new Date().toLocaleTimeString();
+
+        // Build card
+        const div = document.createElement("div");
+        div.className = "alert-item " +
+            (detection === "HUMAN"      ? "alert-human" :
+             detection === "ANIMAL"     ? "alert-animal" :
+                                          "alert-background");
+
+        div.innerHTML = `
+            <div class="alert-top">
+                <span class="alert-label">
+                    ${detection === "HUMAN"  ? "🚨" :
+                      detection === "ANIMAL" ? "🐾" : "✅"}
+                    ${detection}
+                    <span class="badge ${isAlert ? 'badge-alert' : 'badge-clear'}">
+                        ${isAlert ? "ALERT" : "CLEAR"}
+                    </span>
+                </span>
+                <span class="alert-conf">${confPct}% confidence</span>
+            </div>
+            <div class="alert-node">Node: ${nodeId} · Type: ${nodeType}</div>
+            <div class="alert-time">⏱ ${time}</div>
+        `;
+
+        // Newest first
+        container.prepend(div);
+
+        // Update counter
+        count++;
+        countEl.textContent = count;
+    });
+</script>
+</body>
+</html>
