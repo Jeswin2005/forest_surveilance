@@ -57,16 +57,34 @@ void setup() {
 }
 
 void loop() {
-  int packetSize = LoRa.parsePacket();
-  if (packetSize) {
-    String payload = "";
-    while (LoRa.available()) { payload += (char)LoRa.read(); }
-    
-    Serial.println("[LoRa RX] " + payload);
+    // Always listening
+    int packetSize = LoRa.parsePacket();
 
-    // If it's a Camera Node payload, push to the vision path
-    if (payload.startsWith("CAM|")) {
-      Firebase.pushString(fbdo, "forest_data/vision_events", payload);
+    if (packetSize) {
+        String payload = "";
+        while (LoRa.available()) {
+            payload += (char)LoRa.read();
+        }
+
+        int rssi = LoRa.packetRssi();
+        Serial.println("[LoRa RX] " + payload);
+        Serial.println("[RSSI] " + String(rssi) + " dBm");
+
+        if (payload.startsWith("CAM|")) {
+            if (Firebase.ready()) {
+                if (Firebase.pushString(fbdo,
+                    "forest_data/vision_events", payload)) {
+                    Serial.println("[FB] Pushed OK");
+                } else {
+                    Serial.println("[FB] FAILED: "
+                        + fbdo.errorReason());
+                }
+            } else {
+                Serial.println("[FB] Not ready — skipping push");
+            }
+        }
+
+        // Force LoRa back into continuous receive mode
+        LoRa.receive();
     }
-  }
 }
