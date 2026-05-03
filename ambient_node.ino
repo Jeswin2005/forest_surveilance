@@ -74,7 +74,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <LoRa.h>
-#include "DHT.h"
+#include "DHT11.h"
 #include <driver/i2s.h>
 #include "esp_heap_caps.h"
 #include "arduinoFFT.h"
@@ -165,7 +165,7 @@ struct NodeData {
 // ============================================================
 // SENSOR INIT
 // ============================================================
-DHT dht(DHTPIN, DHTTYPE);
+DHT11 dht(DHTPIN, DHTTYPE);
 
 void init_sensors() {
     dht.begin();
