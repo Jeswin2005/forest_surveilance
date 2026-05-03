@@ -11,7 +11,7 @@
             color: white;
         }
         .container {
-            max-width: 650px;
+            max-width: 800px;
             margin: auto;
             background: #16213e;
             padding: 24px;
@@ -34,16 +34,40 @@
             background: #0f3460;
             border-radius: 6px;
             padding: 8px 14px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             font-size: 13px;
             color: #aaa;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 6px;
         }
-        .status-bar span {
-            color: #00d4ff;
+        .status-bar span { color: #00d4ff; font-weight: bold; }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
             font-weight: bold;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            color: white;
         }
+        .tab-btn.active { opacity: 1; }
+        .tab-all    { background: #0f3460; }
+        .tab-cam    { background: #c0392b; }
+        .tab-pest   { background: #1a6b3c; }
+        .tab-audio  { background: #7d3c98; }
+        .tab-fire   { background: #e67e22; }
         #alerts-container {
-            max-height: 480px;
+            max-height: 520px;
             overflow-y: auto;
         }
         .waiting {
@@ -59,41 +83,24 @@
             border-left: 5px solid;
             animation: fadeIn 0.4s ease;
         }
-        .alert-human {
-            background: #2d1515;
-            border-color: #f44336;
-        }
-        .alert-animal {
-            background: #1a2d15;
-            border-color: #4caf50;
-        }
-        .alert-background {
-            background: #1a1a2d;
-            border-color: #555;
-        }
+        .alert-human      { background: #2d1515; border-color: #f44336; }
+        .alert-animal     { background: #1a2d15; border-color: #4caf50; }
+        .alert-background { background: #1a1a2d; border-color: #555;    }
+        .alert-pest       { background: #1a2d1a; border-color: #2ecc71; }
+        .alert-gunshot    { background: #2d1515; border-color: #e74c3c; }
+        .alert-chainsaw   { background: #2d2015; border-color: #e67e22; }
+        .alert-fire       { background: #2d1a00; border-color: #ff6b00; }
+        .alert-env-clear  { background: #1a1a2d; border-color: #555;    }
         .alert-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 4px;
         }
-        .alert-label {
-            font-weight: bold;
-            font-size: 15px;
-        }
-        .alert-conf {
-            font-size: 13px;
-            color: #aaa;
-        }
-        .alert-node {
-            font-size: 12px;
-            color: #777;
-        }
-        .alert-time {
-            font-size: 11px;
-            color: #555;
-            margin-top: 4px;
-        }
+        .alert-label { font-weight: bold; font-size: 15px; }
+        .alert-conf  { font-size: 13px; color: #aaa; }
+        .alert-meta  { font-size: 12px; color: #777; margin-top: 2px; }
+        .alert-time  { font-size: 11px; color: #555; margin-top: 4px; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-8px); }
             to   { opacity: 1; transform: translateY(0); }
@@ -107,7 +114,9 @@
             margin-left: 8px;
         }
         .badge-alert { background: #f44336; color: white; }
-        .badge-clear { background: #555; color: #ccc; }
+        .badge-warn  { background: #e67e22; color: white; }
+        .badge-clear { background: #555;    color: #ccc;  }
+        .badge-pest  { background: #2ecc71; color: #111;  }
     </style>
 </head>
 <body>
@@ -116,8 +125,22 @@
     <p class="subtitle">FEHARP LoRa WSN · ACS Edge AI · Real-Time Alerts</p>
 
     <div class="status-bar">
-        Status: <span id="status-text">Connecting to Firebase...</span>
-        &nbsp;|&nbsp; Events: <span id="event-count">0</span>
+        <div>Status: <span id="status-text">Connecting...</span></div>
+        <div>
+            📷 <span id="cnt-cam">0</span> &nbsp;
+            🐛 <span id="cnt-pest">0</span> &nbsp;
+            🎙️ <span id="cnt-audio">0</span> &nbsp;
+            🔥 <span id="cnt-fire">0</span> &nbsp;
+            Total: <span id="cnt-total">0</span>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn tab-all  active" onclick="filterTab(this,'all')">All Events</button>
+        <button class="tab-btn tab-cam"         onclick="filterTab(this,'cam')">📷 Camera</button>
+        <button class="tab-btn tab-pest"        onclick="filterTab(this,'pest')">🐛 Pest</button>
+        <button class="tab-btn tab-audio"       onclick="filterTab(this,'audio')">🎙️ Audio</button>
+        <button class="tab-btn tab-fire"        onclick="filterTab(this,'fire')">🔥 Fire/Gas</button>
     </div>
 
     <div id="alerts-container">
@@ -131,7 +154,6 @@
     import { getDatabase, ref, onChildAdded }
         from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // ── Firebase config ──────────────────────────────────
     const firebaseConfig = {
         apiKey:      "YOUR_API_KEY",
         databaseURL: "YOUR_DATABASE_URL"
@@ -142,66 +164,174 @@
 
     const container  = document.getElementById("alerts-container");
     const statusText = document.getElementById("status-text");
-    const countEl   = document.getElementById("event-count");
-
-    let isFirst  = true;
-    let count    = 0;
+    let isFirst      = true;
+    let currentTab   = 'all';
+    const counts     = { cam:0, pest:0, audio:0, fire:0, total:0 };
 
     statusText.textContent = "🟢 Live";
     statusText.style.color = "#00ff88";
 
-    // ── Listen for new events ────────────────────────────
+    // ── Tab filter ───────────────────────────────────────
+    window.filterTab = function(btn, tab) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-btn')
+                .forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.alert-item').forEach(el => {
+            el.style.display =
+                (tab === 'all' || el.dataset.type === tab)
+                    ? 'block' : 'none';
+        });
+    };
+
+    function updateCount(type) {
+        counts[type]++;
+        counts.total++;
+        document.getElementById('cnt-' + type).textContent = counts[type];
+        document.getElementById('cnt-total').textContent   = counts.total;
+    }
+
+    function clearWaiting() {
+        if (isFirst) { container.innerHTML = ""; isFirst = false; }
+    }
+
+    function addCard(div, type) {
+        div.dataset.type = type;
+        if (currentTab !== 'all' && currentTab !== type)
+            div.style.display = 'none';
+        container.prepend(div);
+        updateCount(type);
+    }
+
+    // ============================================================
+    // CAMERA NODE — vision_events
+    // Format: CAM|N01|HUMAN/ANIMAL/BACKGROUND|CONFIDENCE
+    // ============================================================
     onChildAdded(ref(db, 'forest_data/vision_events'), (snapshot) => {
-
-        // Clear waiting message on first event
-        if (isFirst) {
-            container.innerHTML = "";
-            isFirst = false;
-        }
-
-        const raw = snapshot.val();
-        // Expected format: CAM|N01|HUMAN|0.96
-        const parts = raw.split("|");
+        clearWaiting();
+        const parts = snapshot.val().split("|");
         if (parts.length < 4) return;
 
-        const nodeType   = parts[0];   // CAM
-        const nodeId     = parts[1];   // N01
-        const detection  = parts[2];   // HUMAN / ANIMAL / BACKGROUND
-        const confidence = parseFloat(parts[3]);
-        const confPct    = (confidence * 100).toFixed(1);
-        const isAlert    = detection !== "BACKGROUND";
-        const time       = new Date().toLocaleTimeString();
+        const nodeId    = parts[1];
+        const detection = parts[2];
+        const confPct   = (parseFloat(parts[3]) * 100).toFixed(1);
+        const isAlert   = detection !== "BACKGROUND";
+        const time      = new Date().toLocaleTimeString();
 
-        // Build card
+        const icon = detection === "HUMAN"  ? "🚨" :
+                     detection === "ANIMAL" ? "🐾" : "✅";
+        const cls  = detection === "HUMAN"  ? "alert-human" :
+                     detection === "ANIMAL" ? "alert-animal" :
+                                              "alert-background";
+        const badge = isAlert
+            ? `<span class="badge badge-alert">ALERT</span>`
+            : `<span class="badge badge-clear">CLEAR</span>`;
+
         const div = document.createElement("div");
-        div.className = "alert-item " +
-            (detection === "HUMAN"      ? "alert-human" :
-             detection === "ANIMAL"     ? "alert-animal" :
-                                          "alert-background");
+        div.className = `alert-item ${cls}`;
+        div.innerHTML = `
+            <div class="alert-top">
+                <span class="alert-label">${icon} ${detection} ${badge}</span>
+                <span class="alert-conf">${confPct}% confidence</span>
+            </div>
+            <div class="alert-meta">📷 Camera Node · ${nodeId}</div>
+            <div class="alert-time">⏱ ${time}</div>
+        `;
+        addCard(div, 'cam');
+    });
 
+    // ============================================================
+    // PEST NODE — pest_events
+    // Format: PEST|N02|PEST_CLASS|CONFIDENCE
+    // ============================================================
+    onChildAdded(ref(db, 'forest_data/pest_events'), (snapshot) => {
+        clearWaiting();
+        const parts = snapshot.val().split("|");
+        if (parts.length < 4) return;
+
+        const nodeId   = parts[1];
+        const pest     = parts[2];
+        const confPct  = (parseFloat(parts[3]) * 100).toFixed(1);
+        const time     = new Date().toLocaleTimeString();
+
+        const div = document.createElement("div");
+        div.className = "alert-item alert-pest";
         div.innerHTML = `
             <div class="alert-top">
                 <span class="alert-label">
-                    ${detection === "HUMAN"  ? "🚨" :
-                      detection === "ANIMAL" ? "🐾" : "✅"}
-                    ${detection}
-                    <span class="badge ${isAlert ? 'badge-alert' : 'badge-clear'}">
-                        ${isAlert ? "ALERT" : "CLEAR"}
-                    </span>
+                    🐛 ${pest}
+                    <span class="badge badge-pest">PEST DETECTED</span>
                 </span>
                 <span class="alert-conf">${confPct}% confidence</span>
             </div>
-            <div class="alert-node">Node: ${nodeId} · Type: ${nodeType}</div>
+            <div class="alert-meta">🌿 Pest Node · ${nodeId}</div>
+            <div class="alert-time">⏱ ${time}</div>
+        `;
+        addCard(div, 'pest');
+    });
+
+    // ============================================================
+    // AMBIENT NODE — audio_events
+    // Format: ENV|N03|CLASS|CONF|T:xx|H:xx|G:CLEAR/DETECTED
+    // ============================================================
+    onChildAdded(ref(db, 'forest_data/audio_events'), (snapshot) => {
+        clearWaiting();
+        const parts = snapshot.val().split("|");
+        if (parts.length < 4) return;
+
+        const nodeId     = parts[1];
+        const audioClass = parts[2];
+        const confPct    = (parseFloat(parts[3]) * 100).toFixed(1);
+        const time       = new Date().toLocaleTimeString();
+
+        // Parse env fields
+        let temp = "–", hum = "–", gas = "–";
+        for (let i = 4; i < parts.length; i++) {
+            if (parts[i].startsWith("T:")) temp = parts[i].substring(2) + "°C";
+            if (parts[i].startsWith("H:")) hum  = parts[i].substring(2) + "%";
+            if (parts[i].startsWith("G:")) gas  = parts[i].substring(2);
+        }
+
+        const isFire     = audioClass === "FIRE";
+        const isGunshot  = audioClass === "GUN_SHOT";
+        const isChainsaw = audioClass === "CHAINSAW";
+
+        const icon = isFire     ? "🔥" :
+                     isGunshot  ? "🔫" :
+                     isChainsaw ? "🪚" : "✅";
+
+        const cls = isFire     ? "alert-fire"     :
+                    isGunshot  ? "alert-gunshot"   :
+                    isChainsaw ? "alert-chainsaw"  :
+                                 "alert-env-clear";
+
+        const badgeClass = isFire                    ? "badge-warn"  :
+                          (isGunshot || isChainsaw)  ? "badge-alert" :
+                                                        "badge-clear";
+        const badgeText  = isFire     ? "FIRE"  :
+                           isGunshot  ? "ALERT" :
+                           isChainsaw ? "ALERT" : "CLEAR";
+
+        const div = document.createElement("div");
+        div.className = `alert-item ${cls}`;
+        div.innerHTML = `
+            <div class="alert-top">
+                <span class="alert-label">
+                    ${icon} ${audioClass}
+                    <span class="badge ${badgeClass}">${badgeText}</span>
+                </span>
+                <span class="alert-conf">${confPct}% confidence</span>
+            </div>
+            <div class="alert-meta">
+                🎙️ Ambient Node · ${nodeId} &nbsp;|&nbsp;
+                🌡️ ${temp} &nbsp; 💧 ${hum} &nbsp; 💨 Gas: ${gas}
+            </div>
             <div class="alert-time">⏱ ${time}</div>
         `;
 
-        // Newest first
-        container.prepend(div);
-
-        // Update counter
-        count++;
-        countEl.textContent = count;
+        addCard(div, isFire ? 'fire' : 'audio');
     });
+
 </script>
 </body>
 </html>
