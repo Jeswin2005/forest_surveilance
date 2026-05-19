@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FEHARP | Forest Command Center</title>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-panel: #151a28;
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+            --border: #1e293b;
+            --accent: #38bdf8;
+            --danger: #ef4444;
+            --warn: #f59e0b;
+            --safe: #10b981;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        /* --- Header & Stats --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+        }
+
+        .title-block h1 { font-size: 24px; color: var(--accent); font-weight: 600; }
+        .title-block p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+        .stats-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card span { display: block; font-size: 20px; font-weight: bold; margin-top: 4px; }
+
+        /* --- SMS Config Panel --- */
+        .sms-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .sms-panel input {
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            outline: none;
+            width: 200px;
+        }
+        .sms-panel button {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .sms-panel button:hover { opacity: 0.8; }
+        .sms-status { font-size: 13px; color: var(--safe); }
+
+        /* --- Filters --- */
+        .filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .filter-btn {
+            background: var(--bg-panel);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .filter-btn.active {
+            background: var(--border);
+            color: white;
+        }
+
+        /* --- Grid Layout for Alerts --- */
+        .alerts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+            max-height: 700px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .event-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Event Type Styling */
+        .type-critical { color: var(--danger); }
+        .type-warning { color: var(--warn); }
+        .type-routine { color: var(--safe); }
+
+        .event-time { font-size: 12px; color: var(--text-muted); font-weight: normal; }
+
+        .event-data {
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+        .event-data span { color: var(--text-muted); }
+        
+        .loc-block {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border);
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <div class="title-block">
+            <h1>FEHARP Command Center</h1>
+            <p>Edge AI Sensor Network · Real-Time Telemetry</p>
+        </div>
+        <div class="stats-row">
+            <div class="stat-card">Total Events <span id="cnt-total">0</span></div>
+            <div class="stat-card">Critical <span id="cnt-crit" style="color:var(--danger)">0</span></div>
+        </div>
+    </div>
+
+    <!-- SMS Configuration Panel -->
+    <div class="sms-panel">
+        <div>
+            <strong>Emergency SMS Routing</strong><br>
+            <span style="font-size:12px; color:var(--text-muted)">Configure active Ranger mobile number for instant critical alerts.</span>
+        </div>
+        <input type="text" id="phoneInput" placeholder="+91 98765 43210">
+        <button onclick="updateSMS()">Update Target</button>
+        <span id="sms-status" class="sms-status"></span>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <button class="filter-btn active" onclick="filterTab(this,'all')">System Wide</button>
+        <button class="filter-btn" onclick="filterTab(this,'cam')">Vision Subsystem</button>
+        <button class="filter-btn" onclick="filterTab(this,'audio')">Acoustic Subsystem</button>
+        <button class="filter-btn" onclick="filterTab(this,'env')">Environmental Data</button>
+    </div>
+
+    <!-- Events Grid -->
+    <div class="alerts-grid" id="grid-container">
+        <!-- Cards injected here by JS -->
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onChildAdded, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // 🔴 INSERT YOUR FIREBASE KEYS HERE
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        databaseURL: "YOUR_DATABASE_URL"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const container = document.getElementById("grid-container");
+
+    // ── NODE LOCATION DATABASE ──
+    const NODE_DB = {
+        "N01": { name: "Sector 1 (Canopy Edge)", lat: "12.8231° N", lng: "80.0453° E" },
+        "N02": { name: "Sector 2 (Core)", lat: "12.8245° N", lng: "80.0461° E" },
+        "N03": { name: "Sector 3 (Riverbank)", lat: "12.8210° N", lng: "80.0422° E" }
+    };
+
+    function getLocation(id) {
+        return NODE_DB[id] || { name: "Unknown Sector", lat: "---", lng: "---" };
+    }
+
+    // ── THE FIREBASE TIMESTAMP SECRET ──
+    // Extracts exact millisecond time from Firebase Push ID
+    const PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+    function decodeFirebaseTime(pushId) {
+        let time = 0;
+        for (let i = 0; i < 8; i++) {
+            time = time * 64 + PUSH_CHARS.indexOf(pushId.charAt(i));
+        }
+        return new Date(time).toLocaleString('en-IN', {
+            hour12: true, month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit', second:'2-digit'
+        });
+    }
+
+    // ── DASHBOARD LOGIC ──
+    let currentTab = 'all';
+    let countTotal = 0;
+    let countCrit = 0;
+
+    window.filterTab = function(btn, tab) {
+        currentTab = tab;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        document.querySelectorAll('.event-card').forEach(el => {
+            el.style.display = (tab === 'all' || el.dataset.type === tab) ? 'block' : 'none';
+        });
+    };
+
+    function injectCard(html, type, isCritical) {
+        const div = document.createElement("div");
+        div.className = "event-card";
+        div.dataset.type = type;
+        div.innerHTML = html;
+        
+        if (currentTab !== 'all' && currentTab !== type) div.style.display = 'none';
+        
+        container.prepend(div);
+        countTotal++;
+        if (isCritical) countCrit++;
+        
+        document.getElementById('cnt-total').textContent = countTotal;
+        document.getElementById('cnt-crit').textContent = countCrit;
+    }
+
+    // ── SMS CONFIGURATION ──
+    window.updateSMS = function() {
+        const phone = document.getElementById("phoneInput").value;
+        if(phone.length < 10) return;
+        set(ref(db, 'forest_data/config/alert_phone'), phone).then(() => {
+            const status = document.getElementById("sms-status");
+            status.textContent = "✔ Routing Updated";
+            setTimeout(() => status.textContent = "", 3000);
+        });
+    };
+
+    // ==========================================
+    // 1. VISION SUBSYSTEM (CAMERA)
+    // Format: CAM|N01|HUMAN/ANIMAL/BACKGROUND|CONF
+    // ==========================================
+    onChildAdded(ref(db, 'forest_data/vision_events'), (snapshot) => {
+        const parts = snapshot.val().split("|");
+        if (parts.length < 4) return;
+
+        const nodeId = parts[1];
+        const detection = parts[2];
+        const eventTime = decodeFirebaseTime(snapshot.key); // REAL TIME!
+        const loc = getLocation(nodeId);
+        
+        let typeClass = "type-routine";
+        let isCrit = false;
+        if(detection === "HUMAN") { typeClass = "type-critical"; isCrit = true; }
+        else if(detection === "ANIMAL") typeClass = "type-warning";
+
+        const html = `
+            <div class="event-header ${typeClass}">
+                <div>📷 Vision: ${detection}</div>
+                <div class="event-time">${eventTime}</div>
+            </div>
+            <div class="event-data">
+                <span>Source Node:</span> ${nodeId} (${loc.name})<br>
+                <span>AI Subsystem:</span> ACS Edge-Vision<br>
+                <span>Status:</span> Logged successfully
+            </div>
+            <div class="loc-block">
+                📍 LAT: ${loc.lat} | LNG: ${loc.lng}
+            </div>
+        `;
+        injectCard(html, 'cam', isCrit);
+    });
+
+    // ==========================================
+    // 2. ACOUSTIC SUBSYSTEM (AUDIO)
+    // Format: ENV|N02|CLASS|CONF|T:x|H:x|G:x
+    // ==========================================
+    onChildAdded(ref(db, 'forest_data/audio_events'), (snapshot) => {
+        const parts = snapshot.val().split("|");
+        if (parts.length < 4) return;
+
+        const nodeId = parts[1];
+        const audioClass = parts[2];
+        const eventTime = decodeFirebaseTime(snapshot.key); // REAL TIME!
+        const loc = getLocation(nodeId);
+
+        let temp = "–", hum = "–", gas = "–";
+        for (let i = 4; i < parts.length; i++) {
+            if (parts[i].startsWith("T:")) temp = parts[i].substring(2) + "°C";
+            if (parts[i].startsWith("H:")) hum = parts[i].substring(2) + "%";
+            if (parts[i].startsWith("G:")) gas = parts[i].substring(2);
+        }
+
+        let typeClass = "type-routine";
+        let isCrit = false;
+        if(audioClass === "GUN_SHOT" || audioClass === "CHAINSAW" || audioClass === "FIRE") {
+            typeClass = "type-critical"; 
+            isCrit = true;
+        }
+
+        const html = `
+            <div class="event-header ${typeClass}">
+                <div>🎙️ Acoustic: ${audioClass}</div>
+                <div class="event-time">${eventTime}</div>
+            </div>
+            <div class="event-data">
+                <span>Source Node:</span> ${nodeId} (${loc.name})<br>
+                <span>Environment:</span> T:${temp} | H:${hum} | Gas:${gas}
+            </div>
+            <div class="loc-block">
+                📍 LAT: ${loc.lat} | LNG: ${loc.lng}
+            </div>
+        `;
+        // Put environmental acoustic stuff under both 'audio' and 'env' tabs usually, 
+        // but we'll tag it as audio to keep it clean.
+        injectCard(html, 'audio', isCrit);
+    });
+
+    // ==========================================
+    // 3. PEST SUBSYSTEM
+    // Format: PEST|N03|CLASS|CONF
+    // ==========================================
+    onChildAdded(ref(db, 'forest_data/pest_events'), (snapshot) => {
+        const parts = snapshot.val().split("|");
+        if (parts.length < 4) return;
+
+        const nodeId = parts[1];
+        const pest = parts[2];
+        const eventTime = decodeFirebaseTime(snapshot.key);
+        const loc = getLocation(nodeId);
+
+        const html = `
+            <div class="event-header type-warning">
+                <div>🐛 Bio-Hazard: ${pest}</div>
+                <div class="event-time">${eventTime}</div>
+            </div>
+            <div class="event-data">
+                <span>Source Node:</span> ${nodeId} (${loc.name})<br>
+                <span>AI Subsystem:</span> ACS Macro-Vision
+            </div>
+            <div class="loc-block">
+                📍 LAT: ${loc.lat} | LNG: ${loc.lng}
+            </div>
+        `;
+        injectCard(html, 'env', false);
+    });
+
+</script>
+</body>
+</html>
